@@ -1,100 +1,235 @@
-import Image from "next/image";
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { TrendingUp, TrendingDown, Wallet, Clock, Megaphone } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ExpenseChart } from '@/components/public/expense-chart';
+import { PublicTransactionsTable } from '@/components/public/public-transactions-table';
+import { PublicAnnouncements } from '@/components/public/public-announcements';
+import { PublicQuotas } from '@/components/public/public-quotas';
+import type { Transaction, Announcement } from '@/types';
 
-export default function Home() {
+export const revalidate = 60;
+
+function formatCLP(amount: number): string {
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    minimumFractionDigits: 0,
+  }).format(amount);
+}
+
+async function getPublicData() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll() {},
+      },
+    }
+  );
+
+  const { data: settingsData } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['active_year', 'course_name', 'show_quotas_public']);
+
+  const settings = (settingsData ?? []).reduce<Record<string, string>>((acc, s) => {
+    acc[s.key] = s.value;
+    return acc;
+  }, {});
+
+  const activeYear = parseInt(settings['active_year'] ?? String(new Date().getFullYear()), 10);
+  const courseName = settings['course_name'] ?? 'Grupo Curso - Novedades y Finanzas';
+  const showQuotasPublic = settings['show_quotas_public'] === 'true';
+
+  const [{ data: transactions }, { data: announcements }] = await Promise.all([
+    supabase.from('transactions').select('*').eq('year', activeYear).order('date', { ascending: false }),
+    supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('published_at', { ascending: false }),
+  ]);
+
+  const txs = (transactions as Transaction[]) ?? [];
+  const totalIncome = txs.filter((t) => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalExpense = txs.filter((t) => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+
+  // Carried balance
+  const { data: prevData } = await supabase.from('transactions').select('type, amount').lt('year', activeYear);
+  const prevIncome = (prevData ?? []).filter((t: { type: string }) => t.type === 'income').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0);
+  const prevExpense = (prevData ?? []).filter((t: { type: string }) => t.type === 'expense').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0);
+  const carriedBalance = prevIncome - prevExpense;
+
+  // Pending commitments
+  const { data: commitmentsData } = await supabase
+    .from('partial_commitments')
+    .select('total_amount, paid_amount')
+    .eq('year', activeYear)
+    .eq('is_completed', false);
+  const totalPending = (commitmentsData ?? []).reduce(
+    (s: number, c: { total_amount: number; paid_amount: number }) => s + (Number(c.total_amount) - Number(c.paid_amount)),
+    0
+  );
+
+  // Quota data
+  let quotaStudents: { full_name: string; quotas: { quota_number: number; is_paid: boolean }[] }[] = [];
+  if (showQuotasPublic) {
+    const [{ data: studentsData }, { data: paymentsData }] = await Promise.all([
+      supabase.from('students').select('id, full_name').eq('active', true).order('full_name'),
+      supabase.from('quota_payments').select('student_id, quota_number, is_paid').eq('year', activeYear),
+    ]);
+    quotaStudents = ((studentsData ?? []) as { id: string; full_name: string }[]).map((s) => ({
+      full_name: s.full_name,
+      quotas: ((paymentsData ?? []) as { student_id: string; quota_number: number; is_paid: boolean }[]).filter((p) => p.student_id === s.id),
+    }));
+  }
+
+  return {
+    courseName,
+    activeYear,
+    transactions: txs,
+    announcements: (announcements as Announcement[]) ?? [],
+    totalIncome,
+    totalExpense,
+    balance: carriedBalance + totalIncome - totalExpense,
+    carriedBalance,
+    totalPending,
+    showQuotasPublic,
+    quotaStudents,
+  };
+}
+
+export default async function PublicPage() {
+  const data = await getPublicData();
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card px-4 py-8 text-center shadow-sm">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{data.courseName}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Período {data.activeYear}</p>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        {/* 2-column layout on desktop */}
+        <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6">
+
+          {/* MAIN COLUMN */}
+          <main className="space-y-6">
+            {/* Summary cards — 2×2 mobile, 4 cols desktop */}
+            <section>
+              <div className={`grid gap-3 grid-cols-2 ${data.totalPending > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+                <Card className="border-t-[3px] border-t-income bg-gradient-to-b from-income-light/50 to-card shadow-card">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                    <CardTitle className="text-xs font-medium text-muted-foreground">Ingresos</CardTitle>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-income-light">
+                      <TrendingUp className="h-3.5 w-3.5 text-income" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <p className="text-xl font-bold text-income sm:text-2xl">{formatCLP(data.totalIncome)}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-t-[3px] border-t-expense bg-gradient-to-b from-expense-light/50 to-card shadow-card">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                    <CardTitle className="text-xs font-medium text-muted-foreground">Egresos</CardTitle>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-expense-light">
+                      <TrendingDown className="h-3.5 w-3.5 text-expense" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <p className="text-xl font-bold text-expense sm:text-2xl">{formatCLP(data.totalExpense)}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-t-[3px] border-t-balance bg-gradient-to-b from-balance-light/50 to-card shadow-card">
+                  <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                    <CardTitle className="text-xs font-medium text-muted-foreground">Saldo</CardTitle>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-balance-light">
+                      <Wallet className="h-3.5 w-3.5 text-balance" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <p className={`text-xl font-bold sm:text-2xl ${data.balance >= 0 ? 'text-income' : 'text-expense'}`}>
+                      {formatCLP(data.balance)}
+                    </p>
+                    {data.carriedBalance !== 0 && (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        Incluye {formatCLP(data.carriedBalance)} anterior
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {data.totalPending > 0 && (
+                  <Card className="border-t-[3px] border-t-amber-400 bg-gradient-to-b from-amber-50/50 to-card shadow-card">
+                    <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                      <CardTitle className="text-xs font-medium text-muted-foreground">Por pagar</CardTitle>
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100">
+                        <Clock className="h-3.5 w-3.5 text-amber-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0">
+                      <p className="text-xl font-bold text-amber-600 sm:text-2xl">{formatCLP(data.totalPending)}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </section>
+
+            {/* Expense donut chart */}
+            <section>
+              <h2 className="mb-3 text-base font-semibold tracking-tight">Distribución de egresos</h2>
+              <Card className="shadow-card">
+                <CardContent className="p-4 sm:p-6">
+                  <ExpenseChart transactions={data.transactions} />
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Transactions */}
+            <section>
+              <h2 className="mb-3 text-base font-semibold">Movimientos recientes</h2>
+              <PublicTransactionsTable transactions={data.transactions} />
+            </section>
+
+            {/* Quotas (conditional) */}
+            {data.showQuotasPublic && data.quotaStudents.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-base font-semibold">Estado de cuotas</h2>
+                <PublicQuotas students={data.quotaStudents} totalQuotas={10} />
+              </section>
+            )}
+
+            {/* Announcements — only visible on mobile (hidden on lg, shown in sidebar) */}
+            <section className="lg:hidden">
+              <h2 className="mb-3 text-base font-semibold">Anuncios</h2>
+              <PublicAnnouncements announcements={data.announcements} />
+            </section>
+          </main>
+
+          {/* SIDEBAR — desktop only, sticky */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-base font-semibold">Anuncios</h2>
+              </div>
+              <PublicAnnouncements announcements={data.announcements} />
+            </div>
+          </aside>
+
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t px-4 py-6 text-center">
+        <p className="text-xs text-muted-foreground">
+          Solo lectura &middot; {data.courseName}
+        </p>
       </footer>
     </div>
   );
