@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,9 @@ export function TransactionForm({
   const [amount, setAmount] = useState(transaction?.amount?.toString() ?? '');
   const [paymentType, setPaymentType] = useState<'complete' | 'partial'>(prefillCommitmentId ? 'partial' : 'complete');
   const [partialMode, setPartialMode] = useState<'new' | 'existing'>(prefillCommitmentId ? 'existing' : 'new');
+  const [totalInputMode, setTotalInputMode] = useState<'amount' | 'percentage'>('amount');
   const [totalCommitmentAmount, setTotalCommitmentAmount] = useState('');
+  const [percentage, setPercentage] = useState('');
   const [selectedCommitmentId, setSelectedCommitmentId] = useState(prefillCommitmentId ?? '');
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedQuotaNumber, setSelectedQuotaNumber] = useState('');
@@ -67,6 +69,28 @@ export function TransactionForm({
 
   const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
   const isQuotaIncome = type === 'income' && (category === 'CUOTAS' || (isCustom && customCategory.toUpperCase().includes('CUOTA')));
+
+  // Calculate total from percentage or vice versa
+  const computedTotal = totalInputMode === 'percentage' && percentage && amount
+    ? Math.round(Number(amount) * 100 / Number(percentage))
+    : totalInputMode === 'amount' ? Number(totalCommitmentAmount) : 0;
+
+  // Auto-detect matching existing commitment when user types category/description
+  const effectiveCategoryForMatch = isCustom ? customCategory.trim().toUpperCase() : category;
+  const matchingCommitment = paymentType === 'partial' && partialMode === 'new'
+    ? pendingCommitments.find((c) =>
+        c.category === effectiveCategoryForMatch &&
+        c.description.toLowerCase().includes((description || effectiveCategoryForMatch).toLowerCase().replace(' (abono parcial)', ''))
+      )
+    : null;
+
+  // Show suggestion banner when a match is found
+  useEffect(() => {
+    // Reset selected commitment when switching to new mode
+    if (partialMode === 'new') {
+      setSelectedCommitmentId('');
+    }
+  }, [partialMode]);
 
   function handleCategoryChange(value: string | null) {
     if (value === CUSTOM_CATEGORY_VALUE) {
@@ -85,6 +109,11 @@ export function TransactionForm({
     return category;
   }
 
+  function switchToExistingCommitment(commitmentId: string) {
+    setPartialMode('existing');
+    setSelectedCommitmentId(commitmentId);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -101,12 +130,19 @@ export function TransactionForm({
 
     // Validate partial payment fields
     if (paymentType === 'partial' && partialMode === 'new') {
-      if (!totalCommitmentAmount || Number(totalCommitmentAmount) <= 0) {
-        setError('Ingresa el monto total del compromiso.');
+      const totalForValidation = computedTotal;
+      if (!totalForValidation || totalForValidation <= 0) {
+        setError(totalInputMode === 'percentage'
+          ? 'Ingresa un porcentaje válido.'
+          : 'Ingresa el monto total del compromiso.');
         return;
       }
-      if (Number(amount) >= Number(totalCommitmentAmount)) {
+      if (Number(amount) >= totalForValidation) {
         setError('El abono debe ser menor al monto total. Usa "Completo" si pagas todo.');
+        return;
+      }
+      if (totalInputMode === 'percentage' && (Number(percentage) <= 0 || Number(percentage) >= 100)) {
+        setError('El porcentaje debe estar entre 1 y 99.');
         return;
       }
     }
@@ -121,16 +157,17 @@ export function TransactionForm({
       // Handle partial payment commitment
       if (paymentType === 'partial') {
         if (partialMode === 'new') {
+          const finalTotal = computedTotal;
           // Create new commitment
           const { data: newCommitment, error: commitError } = await supabase
             .from('partial_commitments')
             .insert({
               description: description || effectiveCategory,
               category: effectiveCategory,
-              total_amount: Number(totalCommitmentAmount),
+              total_amount: finalTotal,
               paid_amount: finalAmount,
               year,
-              is_completed: finalAmount >= Number(totalCommitmentAmount),
+              is_completed: finalAmount >= finalTotal,
             })
             .select('id')
             .single();
@@ -310,7 +347,7 @@ export function TransactionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Monto total ($)</Label>
+            <Label htmlFor="amount">Monto a pagar ($)</Label>
             <Input
               id="amount"
               type="number"
@@ -373,21 +410,97 @@ export function TransactionForm({
                 </div>
 
                 {partialMode === 'new' && (
-                  <div className="space-y-2">
-                    <Label className="text-sm">Monto total del compromiso</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={totalCommitmentAmount}
-                      onChange={(e) => setTotalCommitmentAmount(e.target.value)}
-                      placeholder="Ej: 100000"
-                      className="h-12 text-base"
-                    />
-                    {totalCommitmentAmount && amount && (
-                      <p className="text-xs text-muted-foreground">
-                        Abonando {formatCLP(Number(amount))} de {formatCLP(Number(totalCommitmentAmount))}
-                        {' '}— quedarán {formatCLP(Number(totalCommitmentAmount) - Number(amount))} pendientes
-                      </p>
+                  <div className="space-y-3">
+                    {/* Toggle: monto total vs porcentaje */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">¿Cómo ingresar el total?</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant={totalInputMode === 'amount' ? 'default' : 'outline'}
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setTotalInputMode('amount');
+                            setPercentage('');
+                          }}
+                        >
+                          Monto total ($)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={totalInputMode === 'percentage' ? 'default' : 'outline'}
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setTotalInputMode('percentage');
+                            setTotalCommitmentAmount('');
+                          }}
+                        >
+                          Porcentaje (%)
+                        </Button>
+                      </div>
+                    </div>
+
+                    {totalInputMode === 'amount' ? (
+                      <div className="space-y-2">
+                        <Label className="text-sm">Monto total del compromiso</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={totalCommitmentAmount}
+                          onChange={(e) => setTotalCommitmentAmount(e.target.value)}
+                          placeholder="Ej: 500000"
+                          className="h-12 text-base"
+                        />
+                        {totalCommitmentAmount && amount && (
+                          <p className="text-xs text-muted-foreground">
+                            Abonando {formatCLP(Number(amount))} de {formatCLP(Number(totalCommitmentAmount))}
+                            {' '}— quedarán {formatCLP(Number(totalCommitmentAmount) - Number(amount))} pendientes
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label className="text-sm">Este monto representa el (%)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={percentage}
+                          onChange={(e) => setPercentage(e.target.value)}
+                          placeholder="Ej: 30"
+                          className="h-12 text-base"
+                        />
+                        {percentage && amount && Number(percentage) > 0 && Number(percentage) < 100 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground">
+                              Total calculado: {formatCLP(computedTotal)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Abonando {formatCLP(Number(amount))} ({percentage}%) — quedarán {formatCLP(computedTotal - Number(amount))} pendientes
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Auto-detect matching commitment */}
+                    {matchingCommitment && (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5">
+                        <p className="text-xs font-medium text-amber-800">
+                          Ya existe un compromiso similar:
+                        </p>
+                        <p className="mt-0.5 text-xs text-amber-700">
+                          {matchingCommitment.description} — pendiente: {formatCLP(Number(matchingCommitment.total_amount) - Number(matchingCommitment.paid_amount))}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-2 h-7 text-xs border-amber-400 text-amber-800 hover:bg-amber-100"
+                          onClick={() => switchToExistingCommitment(matchingCommitment.id)}
+                        >
+                          Abonar a este compromiso
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}

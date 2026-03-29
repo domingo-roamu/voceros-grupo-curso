@@ -1,5 +1,5 @@
 import { createClient } from './server';
-import type { Transaction, Announcement, AppSettings, Student, QuotaPayment, PartialCommitment } from '@/types';
+import type { Transaction, Announcement, AnnouncementMedia, AppSettings, Student, QuotaPayment, PartialCommitment } from '@/types';
 
 export async function getTransactions(year: number): Promise<Transaction[]> {
   const supabase = await createClient();
@@ -71,12 +71,35 @@ export async function getAnnouncements(): Promise<Announcement[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('announcements')
-    .select('*')
+    .select('*, announcement_media(*)')
     .order('is_pinned', { ascending: false })
     .order('published_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data as Announcement[]) ?? [];
+
+  return ((data ?? []) as (Announcement & { announcement_media: AnnouncementMedia[] })[]).map((a) => ({
+    ...a,
+    media: a.announcement_media ?? [],
+    announcement_media: undefined,
+  })) as Announcement[];
+}
+
+export async function getAnnouncementById(id: string): Promise<Announcement | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('*, announcement_media(*)')
+    .eq('id', id)
+    .single();
+
+  if (error) return null;
+
+  const row = data as Announcement & { announcement_media: AnnouncementMedia[] };
+  return {
+    ...row,
+    media: (row.announcement_media ?? []).sort((a, b) => a.display_order - b.display_order),
+    announcement_media: undefined,
+  } as Announcement;
 }
 
 export async function getAppSetting(key: string): Promise<string | null> {

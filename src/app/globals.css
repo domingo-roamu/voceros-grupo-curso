@@ -4,99 +4,102 @@
 
 @layer base {
   :root {
+    /* TEI palette: Navy blue + Gold/Yellow + White */
     /* Values are oklch CHANNELS only: L C H */
-    --background: 0.98 0.005 260;
-    --foreground: 0.165 0.015 260;
+    --background: 0.98 0.005 250;
+    --foreground: 0.15 0.02 250;
 
     --card: 1 0 0;
-    --card-foreground: 0.165 0.015 260;
+    --card-foreground: 0.15 0.02 250;
 
     --popover: 1 0 0;
-    --popover-foreground: 0.165 0.015 260;
+    --popover-foreground: 0.15 0.02 250;
 
-    --primary: 0.37 0.12 265;
-    --primary-foreground: 0.985 0.005 260;
+    /* Navy blue primary */
+    --primary: 0.30 0.10 250;
+    --primary-foreground: 0.98 0.005 250;
 
-    --secondary: 0.95 0.02 265;
-    --secondary-foreground: 0.30 0.10 265;
+    --secondary: 0.95 0.015 250;
+    --secondary-foreground: 0.25 0.08 250;
 
-    --muted: 0.955 0.008 260;
-    --muted-foreground: 0.50 0.02 260;
+    --muted: 0.955 0.008 250;
+    --muted-foreground: 0.50 0.02 250;
 
-    --accent: 0.93 0.025 265;
-    --accent-foreground: 0.25 0.10 265;
+    /* Gold/Yellow accent */
+    --accent: 0.88 0.12 85;
+    --accent-foreground: 0.25 0.06 250;
 
     --destructive: 0.577 0.245 27.325;
     --destructive-foreground: 0.985 0 0;
 
-    --border: 0.90 0.01 260;
-    --input: 0.90 0.01 260;
-    --ring: 0.55 0.10 265;
+    --border: 0.90 0.01 250;
+    --input: 0.90 0.01 250;
+    --ring: 0.45 0.10 250;
 
-    --chart-1: 0.65 0.19 162;
-    --chart-2: 0.55 0.18 265;
-    --chart-3: 0.75 0.15 85;
-    --chart-4: 0.60 0.20 25;
-    --chart-5: 0.60 0.14 195;
+    --chart-1: 0.30 0.10 250;
+    --chart-2: 0.80 0.14 85;
+    --chart-3: 0.55 0.12 250;
+    --chart-4: 0.70 0.10 85;
+    --chart-5: 0.45 0.08 200;
 
     --radius: 0.625rem;
 
-    --sidebar: 0.97 0.008 260;
-    --sidebar-foreground: 0.165 0.015 260;
-    --sidebar-primary: 0.37 0.12 265;
-    --sidebar-primary-foreground: 0.985 0.005 260;
-    --sidebar-accent: 0.93 0.025 265;
-    --sidebar-accent-foreground: 0.25 0.10 265;
-    --sidebar-border: 0.90 0.01 260;
-    --sidebar-ring: 0.55 0.10 265;
+    --sidebar: 0.22 0.06 250;
+    --sidebar-foreground: 0.95 0.005 250;
+    --sidebar-primary: 0.80 0.14 85;
+    --sidebar-primary-foreground: 0.20 0.05 250;
+    --sidebar-accent: 0.28 0.04 250;
+    --sidebar-accent-foreground: 0.95 0.005 250;
+    --sidebar-border: 0.30 0.03 250;
+    --sidebar-ring: 0.45 0.10 250;
 
     --income: 0.55 0.17 162;
     --income-light: 0.92 0.05 162;
     --expense: 0.55 0.20 25;
     --expense-light: 0.93 0.04 25;
-    --balance: 0.50 0.15 265;
-    --balance-light: 0.93 0.03 265;
+    --balance: 0.30 0.10 250;
+    --balance-light: 0.93 0.03 250;
   }
 
   .dark {
-    --background: 0.16 0.015 260;
-    --foreground: 0.93 0.005 260;
-    --card: 0.20 0.015 260;
-    --card-foreground: 0.93 0.005 260;
-    --popover: 0.20 0.015 260;
-    --popover-foreground: 0.93 0.005 260;
-    --primary: 0.70 0.10 265;
-    --primary-foreground: 0.16 0.015 260;
-    --secondary: 0.25 0.02 265;
-    --secondary-foreground: 0.93 0.005 260;
-    --muted: 0.25 0.01 260;
-    --muted-foreground: 0.65 0.01 260;
-    --accent: 0.28 0.025 265;
-    --accent-foreground: 0.93 0.005 260;
+    --background: 0.14 0.02 250;
+    --foreground: 0.93 0.005 250;
+    --card: 0.19 0.02 250;
+    --card-foreground: 0.93 0.005 250;
+    --popover: 0.19 0.02 250;
+    --popover-foreground: 0.93 0.005 250;
+    --primary: 0.55 0.10 250;
+    --primary-foreground: 0.98 0.005 250;
+    --secondary: 0.24 0.02 250;
+    --secondary-foreground: 0.93 0.005 250;
+    --muted: 0.24 0.01 250;
+    --muted-foreground: 0.65 0.01 250;
+    --accent: 0.75 0.12 85;
+    --accent-foreground: 0.15 0.04 250;
     --destructive: 0.704 0.191 22.216;
-    --destructive-foreground: 0.93 0.005 260;
-    --border: 0.28 0.01 260;
-    --input: 0.28 0.01 260;
-    --ring: 0.55 0.10 265;
-    --chart-1: 0.65 0.19 162;
-    --chart-2: 0.55 0.18 265;
-    --chart-3: 0.75 0.15 85;
-    --chart-4: 0.60 0.20 25;
-    --chart-5: 0.60 0.14 195;
-    --sidebar: 0.18 0.015 260;
-    --sidebar-foreground: 0.93 0.005 260;
-    --sidebar-primary: 0.70 0.10 265;
-    --sidebar-primary-foreground: 0.16 0.015 260;
-    --sidebar-accent: 0.28 0.025 265;
-    --sidebar-accent-foreground: 0.93 0.005 260;
-    --sidebar-border: 0.28 0.01 260;
-    --sidebar-ring: 0.55 0.10 265;
+    --destructive-foreground: 0.93 0.005 250;
+    --border: 0.28 0.01 250;
+    --input: 0.28 0.01 250;
+    --ring: 0.55 0.10 250;
+    --chart-1: 0.45 0.10 250;
+    --chart-2: 0.80 0.14 85;
+    --chart-3: 0.60 0.12 250;
+    --chart-4: 0.70 0.10 85;
+    --chart-5: 0.50 0.08 200;
+    --sidebar: 0.16 0.02 250;
+    --sidebar-foreground: 0.93 0.005 250;
+    --sidebar-primary: 0.75 0.12 85;
+    --sidebar-primary-foreground: 0.16 0.02 250;
+    --sidebar-accent: 0.24 0.03 250;
+    --sidebar-accent-foreground: 0.93 0.005 250;
+    --sidebar-border: 0.26 0.01 250;
+    --sidebar-ring: 0.55 0.10 250;
     --income: 0.65 0.17 162;
     --income-light: 0.25 0.05 162;
     --expense: 0.65 0.20 25;
     --expense-light: 0.25 0.04 25;
-    --balance: 0.65 0.15 265;
-    --balance-light: 0.25 0.03 265;
+    --balance: 0.55 0.10 250;
+    --balance-light: 0.25 0.03 250;
   }
 }
 

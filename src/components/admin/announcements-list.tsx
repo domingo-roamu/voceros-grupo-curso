@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Pencil, Trash2, Pin, Plus } from 'lucide-react';
+import { Pencil, Trash2, Pin, Plus, Paperclip } from 'lucide-react';
+import { deleteAnnouncementFolder } from '@/lib/supabase/storage';
 import { AnnouncementForm } from './announcement-form';
 import type { Announcement } from '@/types';
 
@@ -22,11 +23,14 @@ export function AnnouncementsList({ announcements }: AnnouncementsListProps) {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Estás seguro de eliminar este anuncio?')) return;
+    if (!confirm('¿Estás seguro de eliminar este anuncio? Se eliminarán también los archivos adjuntos.')) return;
 
     setDeleting(id);
     try {
       const supabase = createClient();
+      // Delete storage files first
+      await deleteAnnouncementFolder(supabase, id).catch(() => {});
+      // Then delete from DB (CASCADE handles announcement_media rows)
       const { error } = await supabase.from('announcements').delete().eq('id', id);
       if (error) throw error;
       router.refresh();
@@ -65,63 +69,84 @@ export function AnnouncementsList({ announcements }: AnnouncementsListProps) {
         <p className="py-8 text-center text-muted-foreground">No hay anuncios publicados.</p>
       ) : (
         <div className="mt-4 space-y-4">
-          {announcements.map((a) => (
-            <Card key={a.id} className="shadow-card transition-shadow hover:shadow-card-hover">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-base">{a.title}</CardTitle>
-                    {a.is_pinned && (
-                      <Badge className="gap-1 border-0 bg-amber-100 text-amber-700">
-                        <Pin className="h-3 w-3" />
-                        Fijado
-                      </Badge>
-                    )}
+          {announcements.map((a) => {
+            const mediaCount = a.media?.length ?? 0;
+            return (
+              <Card key={a.id} className="shadow-card transition-shadow hover:shadow-card-hover">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3">
+                      {a.cover_image_url && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={a.cover_image_url}
+                          alt=""
+                          className="h-12 w-12 flex-shrink-0 rounded-md object-cover"
+                        />
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-base">{a.title}</CardTitle>
+                          {a.is_pinned && (
+                            <Badge className="gap-1 border-0 bg-amber-100 text-amber-700">
+                              <Pin className="h-3 w-3" />
+                              Fijado
+                            </Badge>
+                          )}
+                          {mediaCount > 0 && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                              <Paperclip className="h-3 w-3" />
+                              {mediaCount}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {a.published_at
+                            ? new Date(a.published_at).toLocaleDateString('es-CL', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                              })
+                            : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Switch
+                        checked={a.is_pinned}
+                        onCheckedChange={() => togglePinned(a.id, a.is_pinned)}
+                        aria-label="Fijar anuncio"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Switch
-                      checked={a.is_pinned}
-                      onCheckedChange={() => togglePinned(a.id, a.is_pinned)}
-                      aria-label="Fijar anuncio"
-                    />
+                </CardHeader>
+                <CardContent>
+                  <p className="whitespace-pre-wrap text-sm line-clamp-3">{a.content}</p>
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="min-h-[44px]"
+                      onClick={() => setEditingAnnouncement(a)}
+                    >
+                      <Pencil className="mr-1 h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="min-h-[44px]"
+                      onClick={() => handleDelete(a.id)}
+                      disabled={deleting === a.id}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      {deleting === a.id ? '...' : 'Eliminar'}
+                    </Button>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {a.published_at
-                    ? new Date(a.published_at).toLocaleDateString('es-CL', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
-                    : ''}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap text-sm">{a.content}</p>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px]"
-                    onClick={() => setEditingAnnouncement(a)}
-                  >
-                    <Pencil className="mr-1 h-4 w-4" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="min-h-[44px]"
-                    onClick={() => handleDelete(a.id)}
-                    disabled={deleting === a.id}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    {deleting === a.id ? '...' : 'Eliminar'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

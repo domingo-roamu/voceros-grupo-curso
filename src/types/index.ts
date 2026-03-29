@@ -50,6 +50,19 @@ export interface QuotaPayment {
   notes: string | null;
 }
 
+export interface AnnouncementMedia {
+  id: string;
+  announcement_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_path: string;
+  media_type: 'image' | 'video' | 'document' | 'embed';
+  embed_url: string | null;
+  display_order: number;
+  created_at: string;
+}
+
 export interface Announcement {
   id: string;
   title: string;
@@ -58,6 +71,8 @@ export interface Announcement {
   published_at: string | null;
   created_by: string | null;
   created_at: string;
+  cover_image_url: string | null;
+  media?: AnnouncementMedia[];
 }
 
 export interface ReportSchedule {

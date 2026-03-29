@@ -6,7 +6,9 @@ import { ExpenseChart } from '@/components/public/expense-chart';
 import { PublicTransactionsTable } from '@/components/public/public-transactions-table';
 import { PublicAnnouncements } from '@/components/public/public-announcements';
 import { PublicQuotas } from '@/components/public/public-quotas';
-import type { Transaction, Announcement } from '@/types';
+import { YearSelector } from '@/components/public/year-selector';
+import { BankInfoButton } from '@/components/public/bank-info-button';
+import type { Transaction, Announcement, AnnouncementMedia } from '@/types';
 
 export const revalidate = 60;
 
@@ -18,7 +20,7 @@ function formatCLP(amount: number): string {
   }).format(amount);
 }
 
-async function getPublicData() {
+async function getPublicData(yearParam?: number) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,21 +37,28 @@ async function getPublicData() {
 
   const { data: settingsData } = await supabase
     .from('app_settings')
-    .select('key, value')
-    .in('key', ['active_year', 'course_name', 'show_quotas_public']);
+    .select('key, value');
 
   const settings = (settingsData ?? []).reduce<Record<string, string>>((acc, s) => {
     acc[s.key] = s.value;
     return acc;
   }, {});
 
-  const activeYear = parseInt(settings['active_year'] ?? String(new Date().getFullYear()), 10);
+  const defaultYear = parseInt(settings['active_year'] ?? String(new Date().getFullYear()), 10);
+  const activeYear = yearParam ?? defaultYear;
   const courseName = settings['course_name'] ?? 'Grupo Curso - Novedades y Finanzas';
   const showQuotasPublic = settings['show_quotas_public'] === 'true';
 
+  // Get available years from transactions
+  const { data: yearsData } = await supabase
+    .from('transactions')
+    .select('year');
+  const availableYears = Array.from(new Set((yearsData ?? []).map((d: { year: number }) => d.year))).sort((a, b) => a - b);
+  if (!availableYears.includes(defaultYear)) availableYears.push(defaultYear);
+
   const [{ data: transactions }, { data: announcements }] = await Promise.all([
     supabase.from('transactions').select('*').eq('year', activeYear).order('date', { ascending: false }),
-    supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('published_at', { ascending: false }),
+    supabase.from('announcements').select('*, announcement_media(*)').order('is_pinned', { ascending: false }).order('published_at', { ascending: false }),
   ]);
 
   const txs = (transactions as Transaction[]) ?? [];
@@ -89,8 +98,14 @@ async function getPublicData() {
   return {
     courseName,
     activeYear,
+    defaultYear,
+    availableYears,
     transactions: txs,
-    announcements: (announcements as Announcement[]) ?? [],
+    announcements: ((announcements ?? []) as (Announcement & { announcement_media: AnnouncementMedia[] })[]).map((a) => ({
+      ...a,
+      media: a.announcement_media ?? [],
+      announcement_media: undefined,
+    })) as Announcement[],
     totalIncome,
     totalExpense,
     balance: carriedBalance + totalIncome - totalExpense,
@@ -98,18 +113,40 @@ async function getPublicData() {
     totalPending,
     showQuotasPublic,
     quotaStudents,
+    bankInfo: (settings['bank_holder'] && settings['bank_holder'] !== '-' && settings['bank_holder'].trim() !== '') ? {
+      holder: settings['bank_holder'],
+      rut: settings['bank_rut'] ?? '',
+      bank: settings['bank_name'] ?? '',
+      accountType: settings['bank_account_type'] ?? '',
+      accountNumber: settings['bank_account_number'] ?? '',
+      email: settings['bank_email'] ?? '',
+    } : null,
   };
 }
 
-export default async function PublicPage() {
-  const data = await getPublicData();
+interface PageProps {
+  searchParams: Promise<{ year?: string }>;
+}
+
+export default async function PublicPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const yearParam = params.year ? parseInt(params.year, 10) : undefined;
+  const data = await getPublicData(yearParam && !isNaN(yearParam) ? yearParam : undefined);
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card px-4 py-8 text-center shadow-sm">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{data.courseName}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Período {data.activeYear}</p>
+      <header className="border-b bg-card px-4 py-6 shadow-sm sm:py-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight sm:text-3xl">{data.courseName}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Período {data.activeYear}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <BankInfoButton bankInfo={data.bankInfo} />
+            <YearSelector currentYear={data.activeYear} availableYears={data.availableYears} />
+          </div>
+        </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-4 py-6">
