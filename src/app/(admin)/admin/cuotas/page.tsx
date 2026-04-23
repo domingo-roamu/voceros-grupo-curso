@@ -1,12 +1,14 @@
-import { getStudentsWithQuotas, getActiveYear, getAppSetting } from '@/lib/supabase/queries';
-import { QuotasGrid } from '@/components/admin/quotas-grid';
+import { getQuotasWithSummary, getActiveYear, getAppSetting, getStudents } from '@/lib/supabase/queries';
+import { QuotasList } from '@/components/admin/quotas-list';
 import { QuotasConfig } from '@/components/admin/quotas-config';
 
 export default async function CuotasPage() {
   const activeYear = await getActiveYear();
-  const students = await getStudentsWithQuotas(activeYear);
-  const showPublic = (await getAppSetting('show_quotas_public')) === 'true';
-  const annualAmount = await getAppSetting('quota_annual_amount');
+  const [quotas, students, showPublic] = await Promise.all([
+    getQuotasWithSummary(activeYear),
+    getStudents(),
+    getAppSetting('show_quotas_public').then((v) => v === 'true'),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -14,16 +16,13 @@ export default async function CuotasPage() {
         <div>
           <h2 className="text-xl font-bold">Cuotas {activeYear}</h2>
           <p className="text-sm text-muted-foreground">
-            Seguimiento de pago de cuotas por alumno
+            Cuota de curso y cuotas ad-hoc del año
           </p>
         </div>
-        <QuotasConfig
-          showPublic={showPublic}
-          annualAmount={parseInt(annualAmount ?? '30000', 10)}
-        />
+        <QuotasConfig showPublic={showPublic} />
       </div>
 
-      <QuotasGrid students={students} year={activeYear} />
+      <QuotasList quotas={quotas} students={students} year={activeYear} />
     </div>
   );
 }

@@ -13,11 +13,9 @@ interface StudentFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   student?: Student | null;
-  year: number;
-  totalQuotas: number;
 }
 
-export function StudentForm({ open, onOpenChange, student, year, totalQuotas }: StudentFormProps) {
+export function StudentForm({ open, onOpenChange, student }: StudentFormProps) {
   const router = useRouter();
   const isEditing = !!student;
 
@@ -57,25 +55,10 @@ export function StudentForm({ open, onOpenChange, student, year, totalQuotas }: 
           .eq('id', student.id);
         if (updateError) throw updateError;
       } else {
-        // Insert student
-        const { data, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('students')
-          .insert({ ...payload, active: true })
-          .select('id')
-          .single();
+          .insert({ ...payload, active: true });
         if (insertError) throw insertError;
-
-        // Create empty quota_payments for current year
-        if (data) {
-          const quotas = Array.from({ length: totalQuotas }, (_, i) => ({
-            student_id: data.id,
-            year,
-            quota_number: i + 1,
-            amount: null,
-            is_paid: false,
-          }));
-          await supabase.from('quota_payments').insert(quotas);
-        }
       }
 
       onOpenChange(false);

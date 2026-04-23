@@ -7,15 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
 import { formatCLP } from './finance-summary-cards';
 import { TransactionForm } from './transaction-form';
-import type { PartialCommitment, Student } from '@/types';
+import type { PartialCommitment } from '@/types';
 
 interface CommitmentsListProps {
   commitments: PartialCommitment[];
   year: number;
-  students: Student[];
 }
 
-export function CommitmentsList({ commitments, year, students }: CommitmentsListProps) {
+export function CommitmentsList({ commitments, year }: CommitmentsListProps) {
   const [abonarId, setAbonarId] = useState<string | null>(null);
 
   const pending = commitments.filter((c) => !c.is_completed);
@@ -77,7 +76,6 @@ export function CommitmentsList({ commitments, year, students }: CommitmentsList
           open={!!abonarId}
           onOpenChange={(open) => !open && setAbonarId(null)}
           year={year}
-          students={students}
           pendingCommitments={pending}
           prefillCommitmentId={abonarId}
         />

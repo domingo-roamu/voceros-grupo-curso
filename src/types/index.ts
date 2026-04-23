@@ -41,13 +41,34 @@ export interface Student {
 
 export interface QuotaPayment {
   id: string;
+  quota_id: string;
   student_id: string;
   year: number;
-  quota_number: number;
+  installment_number: number;
   amount: number | null;
   paid_at: string | null;
   is_paid: boolean;
   notes: string | null;
+}
+
+export type QuotaKind = 'course' | 'adhoc';
+
+export interface Quota {
+  id: string;
+  name: string;
+  description: string | null;
+  total_amount: number;
+  installments: number;
+  year: number;
+  kind: QuotaKind;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface QuotaParticipant {
+  quota_id: string;
+  student_id: string;
+  amount_per_installment: number;
 }
 
 export interface AnnouncementMedia {

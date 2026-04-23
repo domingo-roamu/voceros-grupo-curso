@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getTransactions, getAvailableYears, getFinancialSummary, getStudents, getPendingCommitments, getTotalPending } from '@/lib/supabase/queries';
+import { getTransactions, getAvailableYears, getFinancialSummary, getPendingCommitments, getTotalPending } from '@/lib/supabase/queries';
 import { FinanceSummaryCards } from '@/components/admin/finance-summary-cards';
 import { TransactionsTable } from '@/components/admin/transactions-table';
 import { FinanceFilters } from '@/components/admin/finance-filters';
@@ -31,10 +31,9 @@ export default async function FinanzasPage({ searchParams }: FinanzasPageProps) 
   const typeFilter = searchParams.type ?? 'all';
   const categoryFilter = searchParams.category ?? 'all';
 
-  const [summary, allTransactions, students, pendingCommitments, totalPending] = await Promise.all([
+  const [summary, allTransactions, pendingCommitments, totalPending] = await Promise.all([
     getFinancialSummary(selectedYear),
     getTransactions(selectedYear),
-    getStudents(),
     getPendingCommitments(selectedYear),
     getTotalPending(selectedYear),
   ]);
@@ -52,7 +51,6 @@ export default async function FinanzasPage({ searchParams }: FinanzasPageProps) 
           <h2 className="text-xl font-bold">Finanzas</h2>
           <AddTransactionButton
             year={selectedYear}
-            students={students}
             pendingCommitments={pendingCommitments}
           />
         </div>
@@ -71,14 +69,12 @@ export default async function FinanzasPage({ searchParams }: FinanzasPageProps) 
           <CommitmentsList
             commitments={pendingCommitments}
             year={selectedYear}
-            students={students}
           />
         )}
 
         <TransactionsTable
           transactions={filteredTransactions}
           year={selectedYear}
-          students={students}
         />
       </div>
     </Suspense>

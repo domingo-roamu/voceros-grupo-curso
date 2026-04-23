@@ -15,8 +15,10 @@ interface QuotaPaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   studentName: string;
   studentId: string;
-  quotaNumber: number;
+  quotaId: string;
+  installmentNumber: number;
   year: number;
+  defaultAmount: number;
   existing?: QuotaPayment | null;
 }
 
@@ -25,12 +27,14 @@ export function QuotaPaymentDialog({
   onOpenChange,
   studentName,
   studentId,
-  quotaNumber,
+  quotaId,
+  installmentNumber,
   year,
+  defaultAmount,
   existing,
 }: QuotaPaymentDialogProps) {
   const router = useRouter();
-  const [amount, setAmount] = useState(existing?.amount?.toString() ?? '10000');
+  const [amount, setAmount] = useState(existing?.amount?.toString() ?? String(defaultAmount));
   const [paidAt, setPaidAt] = useState(
     existing?.paid_at ?? new Date().toISOString().split('T')[0]
   );
@@ -46,9 +50,10 @@ export function QuotaPaymentDialog({
     try {
       const supabase = createClient();
       const payload = {
+        quota_id: quotaId,
         student_id: studentId,
         year,
-        quota_number: quotaNumber,
+        installment_number: installmentNumber,
         amount: Number(amount),
         paid_at: paidAt,
         is_paid: true,
@@ -64,7 +69,7 @@ export function QuotaPaymentDialog({
       } else {
         const { error: insertError } = await supabase
           .from('quota_payments')
-          .upsert(payload, { onConflict: 'student_id,year,quota_number' });
+          .upsert(payload, { onConflict: 'quota_id,student_id,installment_number' });
         if (insertError) throw insertError;
       }
 
@@ -101,7 +106,7 @@ export function QuotaPaymentDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Cuota {quotaNumber} — {studentName}
+            Cuota {installmentNumber} — {studentName}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -4,15 +4,14 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { TransactionForm } from './transaction-form';
-import type { Student, PartialCommitment } from '@/types';
+import type { PartialCommitment } from '@/types';
 
 interface AddTransactionButtonProps {
   year: number;
-  students?: Student[];
   pendingCommitments?: PartialCommitment[];
 }
 
-export function AddTransactionButton({ year, students = [], pendingCommitments = [] }: AddTransactionButtonProps) {
+export function AddTransactionButton({ year, pendingCommitments = [] }: AddTransactionButtonProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -35,7 +34,7 @@ export function AddTransactionButton({ year, students = [], pendingCommitments =
         <Plus className="h-6 w-6" />
       </button>
 
-      <TransactionForm open={open} onOpenChange={setOpen} year={year} students={students} pendingCommitments={pendingCommitments} />
+      <TransactionForm open={open} onOpenChange={setOpen} year={year} pendingCommitments={pendingCommitments} />
     </>
   );
 }

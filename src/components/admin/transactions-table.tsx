@@ -16,15 +16,14 @@ import { Badge } from '@/components/ui/badge';
 import { Pencil, Trash2 } from 'lucide-react';
 import { formatCLP } from './finance-summary-cards';
 import { TransactionForm } from './transaction-form';
-import type { Transaction, Student } from '@/types';
+import type { Transaction } from '@/types';
 
 interface TransactionsTableProps {
   transactions: Transaction[];
   year: number;
-  students?: Student[];
 }
 
-export function TransactionsTable({ transactions, year, students = [] }: TransactionsTableProps) {
+export function TransactionsTable({ transactions, year }: TransactionsTableProps) {
   const router = useRouter();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -167,7 +166,6 @@ export function TransactionsTable({ transactions, year, students = [] }: Transac
           onOpenChange={(open) => !open && setEditingTransaction(null)}
           transaction={editingTransaction}
           year={year}
-          students={students}
         />
       )}
     </>

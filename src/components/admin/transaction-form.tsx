@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, type Transaction, type Student, type PartialCommitment } from '@/types';
+import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, type Transaction, type PartialCommitment } from '@/types';
 import { formatCLP } from './finance-summary-cards';
 
 const CUSTOM_CATEGORY_VALUE = '__custom__';
@@ -30,7 +30,6 @@ interface TransactionFormProps {
   onOpenChange: (open: boolean) => void;
   transaction?: Transaction | null;
   year: number;
-  students?: Student[];
   pendingCommitments?: PartialCommitment[];
   prefillCommitmentId?: string;
 }
@@ -40,7 +39,6 @@ export function TransactionForm({
   onOpenChange,
   transaction,
   year,
-  students = [],
   pendingCommitments = [],
   prefillCommitmentId,
 }: TransactionFormProps) {
@@ -60,15 +58,12 @@ export function TransactionForm({
   const [totalCommitmentAmount, setTotalCommitmentAmount] = useState('');
   const [percentage, setPercentage] = useState('');
   const [selectedCommitmentId, setSelectedCommitmentId] = useState(prefillCommitmentId ?? '');
-  const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [selectedQuotaNumber, setSelectedQuotaNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedCommitment = pendingCommitments.find((c) => c.id === selectedCommitmentId);
 
   const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  const isQuotaIncome = type === 'income' && (category === 'CUOTAS' || (isCustom && customCategory.toUpperCase().includes('CUOTA')));
 
   // Calculate total from percentage or vice versa
   const computedTotal = totalInputMode === 'percentage' && percentage && amount
@@ -213,23 +208,6 @@ export function TransactionForm({
       } else {
         const { error: insertError } = await supabase.from('transactions').insert(payload);
         if (insertError) throw insertError;
-
-        // If it's a quota income linked to a student, mark the quota as paid
-        if (isQuotaIncome && selectedStudentId && selectedQuotaNumber) {
-          const quotaNum = parseInt(selectedQuotaNumber, 10);
-          await supabase.from('quota_payments').upsert(
-            {
-              student_id: selectedStudentId,
-              year,
-              quota_number: quotaNum,
-              amount: finalAmount,
-              paid_at: date,
-              is_paid: true,
-              notes: paymentType === 'partial' ? 'Abono parcial' : null,
-            },
-            { onConflict: 'student_id,year,quota_number' }
-          );
-        }
       }
 
       onOpenChange(false);
@@ -535,64 +513,6 @@ export function TransactionForm({
               </div>
             )}
           </div>
-
-          {/* Link to student quota (only for CUOTAS income) */}
-          {isQuotaIncome && students.length > 0 && (
-            <div className="space-y-3 rounded-lg border border-income/20 bg-income-light/30 p-3">
-              <Label className="text-sm font-medium text-income">
-                Asignar a alumno (marca cuota como pagada)
-              </Label>
-              <Select
-                value={selectedStudentId}
-                onValueChange={(v) => setSelectedStudentId(v ?? '')}
-              >
-                <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Seleccionar alumno" />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedStudentId && (() => {
-                const student = students.find((s) => s.id === selectedStudentId);
-                const plan = student?.quota_plan?.[String(year)];
-                const maxQ = plan?.total_quotas ?? 6;
-                return (
-                  <div className="space-y-2">
-                    {!plan && (
-                      <p className="text-xs text-amber-600">
-                        Este alumno no tiene plan de cuotas definido. Se usará el N° que selecciones.
-                      </p>
-                    )}
-                    {plan && (
-                      <p className="text-xs text-muted-foreground">
-                        Plan: {plan.total_quotas} cuota{plan.total_quotas > 1 ? 's' : ''} de {formatCLP(plan.amount_per_quota)}
-                      </p>
-                    )}
-                    <Select
-                      value={selectedQuotaNumber}
-                      onValueChange={(v) => setSelectedQuotaNumber(v ?? '')}
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder="N° de cuota" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: maxQ }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            Cuota {i + 1}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

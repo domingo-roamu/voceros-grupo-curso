@@ -285,8 +285,6 @@ export function ApoderadosList({ students, totalEmails }: ApoderadosListProps) {
       <StudentForm
         open={showAddStudent}
         onOpenChange={setShowAddStudent}
-        year={new Date().getFullYear()}
-        totalQuotas={0}
       />
     </div>
   );

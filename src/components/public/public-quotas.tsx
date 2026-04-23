@@ -3,7 +3,7 @@ import { Check, X } from 'lucide-react';
 
 interface PublicQuotaStudent {
   full_name: string;
-  quotas: { quota_number: number; is_paid: boolean }[];
+  quotas: { installment_number: number; is_paid: boolean }[];
 }
 
 interface PublicQuotasProps {
@@ -12,7 +12,7 @@ interface PublicQuotasProps {
 }
 
 export function PublicQuotas({ students, totalQuotas }: PublicQuotasProps) {
-  if (students.length === 0) return null;
+  if (students.length === 0 || totalQuotas === 0) return null;
 
   const quotaNumbers = Array.from({ length: totalQuotas }, (_, i) => i + 1);
 
@@ -28,7 +28,7 @@ export function PublicQuotas({ students, totalQuotas }: PublicQuotasProps) {
             <CardContent>
               <div className="flex flex-wrap gap-1.5">
                 {quotaNumbers.map((num) => {
-                  const quota = student.quotas.find((q) => q.quota_number === num);
+                  const quota = student.quotas.find((q) => q.installment_number === num);
                   const isPaid = quota?.is_paid ?? false;
                   return (
                     <div
@@ -69,7 +69,7 @@ export function PublicQuotas({ students, totalQuotas }: PublicQuotasProps) {
                 <tr key={student.full_name} className="border-b">
                   <td className="px-4 py-2.5 font-medium">{student.full_name}</td>
                   {quotaNumbers.map((num) => {
-                    const quota = student.quotas.find((q) => q.quota_number === num);
+                    const quota = student.quotas.find((q) => q.installment_number === num);
                     const isPaid = quota?.is_paid ?? false;
                     return (
                       <td key={num} className="px-2 py-2.5 text-center">

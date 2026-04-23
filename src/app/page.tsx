@@ -82,17 +82,47 @@ async function getPublicData(yearParam?: number) {
     0
   );
 
-  // Quota data
-  let quotaStudents: { full_name: string; quotas: { quota_number: number; is_paid: boolean }[] }[] = [];
+  // Quota data: curso del año activo
+  let quotaStudents: { full_name: string; quotas: { installment_number: number; is_paid: boolean }[] }[] = [];
+  let quotaInstallments = 0;
   if (showQuotasPublic) {
-    const [{ data: studentsData }, { data: paymentsData }] = await Promise.all([
-      supabase.from('students').select('id, full_name').eq('active', true).order('full_name'),
-      supabase.from('quota_payments').select('student_id, quota_number, is_paid').eq('year', activeYear),
-    ]);
-    quotaStudents = ((studentsData ?? []) as { id: string; full_name: string }[]).map((s) => ({
-      full_name: s.full_name,
-      quotas: ((paymentsData ?? []) as { student_id: string; quota_number: number; is_paid: boolean }[]).filter((p) => p.student_id === s.id),
-    }));
+    const { data: courseQuotaData } = await supabase
+      .from('quotas')
+      .select('id, installments')
+      .eq('year', activeYear)
+      .eq('kind', 'course')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (courseQuotaData) {
+      quotaInstallments = courseQuotaData.installments as number;
+      const quotaId = courseQuotaData.id as string;
+
+      const [{ data: participantsData }, { data: paymentsData }] = await Promise.all([
+        supabase
+          .from('quota_participants')
+          .select('student_id, student:students(id, full_name, active)')
+          .eq('quota_id', quotaId),
+        supabase
+          .from('quota_payments')
+          .select('student_id, installment_number, is_paid')
+          .eq('quota_id', quotaId),
+      ]);
+
+      const rawParticipants = (participantsData ?? []) as unknown as {
+        student_id: string;
+        student: { id: string; full_name: string; active: boolean } | null;
+      }[];
+      const participants = rawParticipants
+        .filter((p) => p.student?.active)
+        .sort((a, b) => (a.student?.full_name ?? '').localeCompare(b.student?.full_name ?? ''));
+
+      quotaStudents = participants.map((p) => ({
+        full_name: p.student!.full_name,
+        quotas: ((paymentsData ?? []) as { student_id: string; installment_number: number; is_paid: boolean }[])
+          .filter((pay) => pay.student_id === p.student_id),
+      }));
+    }
   }
 
   return {
@@ -113,6 +143,7 @@ async function getPublicData(yearParam?: number) {
     totalPending,
     showQuotasPublic,
     quotaStudents,
+    quotaInstallments,
     bankInfo: (settings['bank_holder'] && settings['bank_holder'] !== '-' && settings['bank_holder'].trim() !== '') ? {
       holder: settings['bank_holder'],
       rut: settings['bank_rut'] ?? '',
@@ -237,7 +268,7 @@ export default async function PublicPage({ searchParams }: PageProps) {
             {data.showQuotasPublic && data.quotaStudents.length > 0 && (
               <section>
                 <h2 className="mb-3 text-base font-semibold">Estado de cuotas</h2>
-                <PublicQuotas students={data.quotaStudents} totalQuotas={10} />
+                <PublicQuotas students={data.quotaStudents} totalQuotas={data.quotaInstallments} />
               </section>
             )}
 
